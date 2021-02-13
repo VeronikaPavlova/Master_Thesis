@@ -1,0 +1,7 @@
+roslaunch>=1.14.10
+rostopic>=1.14.10
+librosa>=0.8.0
+numpy>=1.18.3
+rospy>=1.14.10
+scipy>=1.4.1
+jacktools>=1.0.1
