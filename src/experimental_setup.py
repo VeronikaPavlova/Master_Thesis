@@ -1,27 +1,29 @@
-import subprocess
-import librosa
-import numpy
-
-import rospy
 import os
 import sys
 import time
+from datetime import date
 
-import logging
-
-from matplotlib import pyplot
-
-import scipy.io.wavfile
-from jacktools.jacksignal import JackSignal
-from matplotlib.widgets import Button
+import subprocess
 import random
+import librosa
+import numpy
+import rospy
+from jacktools.jacksignal import JackSignal
+import scipy.io.wavfile
+
+import roslaunch
+import rospkg
+
+import getch
+import logging
 
 LOG_DIR = "../logs"
 LOGGING_LEVEL = logging.DEBUG
 logger = logging.getLogger("record_experiment")
 
-BASE_DIR = "."
-MODEL_NAME = "Test"
+
+MODEL_NAME = date.today().strftime("%d_%m_%y") + "_Test"
+BASE_DIR = os.path.dirname(sys.argv[0]) + "/experiment_data"
 
 # TODO: Add just 30 Labels or how does it work for regression?
 CLASS_LABELS = ["top", "middle", "base"]  # classes to train
@@ -46,22 +48,54 @@ SOUNDS = dict({
 
 
 def main():
-    # Initialize AS Node
-    rospy.init_node('AcousticSensing', anonymous=True)
-
-    # needs to start after rospy.init or else it will be overwritten
     setup_logger()
 
     global DATA_DIR
     DATA_DIR = mkpath(BASE_DIR, MODEL_NAME)
 
-    logger.info("Setting up the experiment /n")
-    setup_experiment()
+    logger.info("Setting up Active Acoustic Sensors /n")
+    setup_AAS()
+
+
+    logger.info("Setting up Strain Sensors /n")
+    setup_strain_sensors()
+    time.sleep(1)
+
+    start_experiment()
+
     logger.info("Run experiment /n")
-    run_experiment()
 
 
-def setup_experiment():
+def start_experiment():
+    logger.info("Setup Jack /n")
+    setup_jack(SOUND_NAME)
+
+    looping = True
+
+    while looping:
+        print("Space to start recording!")
+        char = getch.getch()
+
+        while char != " ":
+            if char == "q":
+                print("Quitting Experiment")
+                return
+        record_strain_rosbag()
+        record_acoustic()
+        time.sleep(2)
+
+        # Do some stuff
+
+        print("Press Space when you are done!")
+        char = getch.getch()
+        while char != " ":
+            if char == "q":
+                print("Quitting Experiment")
+
+                return
+
+
+def setup_AAS():
     # open JACK Audio control interface
     with open(os.devnull, 'w') as fp:
         subprocess.Popen(("qjackctl",), stdout=fp)
@@ -78,89 +112,6 @@ def setup_experiment():
         random.shuffle(label_list)
     current_idx = 0
 
-    # # subscribe to force/torque data from ROS
-    # rospy.Subscriber("netft_data", WrenchStamped, get_ft)
-    # # subscribe to pressure data from ROS
-    # rospy.Subscriber("pneumaticbox/pressure_0", std_msgs.msg.Float64, get_pressure)
-    # logger.debug("ros subscribers done")
-
-
-def run_experiment():
-    # Setup Jack
-    logger.info("Setup Jack /n")
-    setup_jack(SOUND_NAME)
-
-    setup_matplotlib()
-
-def setup_matplotlib():
-    global LINES
-    global TITLE
-    global b_rec
-
-
-    fix, ax = pyplot.subplots(1)
-    ax.set_ylim(-.5,.5)
-    pyplot.subplots_adjust(bottom=.2)
-    LINES, = ax.plot(Ains[0])
-    ax_back = pyplot.axes([0.59, 0.05, 0.1, 0.075])
-    b_back = Button(ax_back, '[B]ack')
-    b_back.on_clicked(back)
-    ax_rec = pyplot.axes([0.81, 0.05, 0.1, 0.075])
-    b_rec = Button(ax_rec, '[R]ecord')
-    b_rec.on_clicked(record)
-    # cid = fig.canvas.mpl_connect('key_press_event', on_key)
-    TITLE = ax.set_title(get_current_title())
-    pyplot.show()
-
-def l(i):
-    try:
-        return label_list[i]
-    except IndexError:
-        # print("current_idx: {}, i: {}".format(current_idx, i))
-        return ""
-
-def get_current_title():
-    name = "Model: {}".format(MODEL_NAME.replace("_", " "))
-    labels = "previous: {}   current: [{}]   next: {}".format(l(current_idx-1), l(current_idx), l(current_idx+1))
-    number = "#{}/{}: {}".format(current_idx+1, len(label_list), l(current_idx))
-    if current_idx >= len(label_list):
-        number += "DONE!"
-    title = "{}\n{}\n{}".format(name, labels, number)
-    return title
-
-def back(event):
-    global current_idx
-    # switch to previous
-    current_idx = max(0, current_idx-1)
-    update()
-
-def record(event):
-    global current_idx
-    if current_idx >= len(label_list):
-        print("current_idx: {}  >= len(label_list): {}".format(current_idx, len(label_list)))
-        return
-
-    global J
-    global Ains
-    # touch object and start sound
-    # wait for recording
-    # store current sound
-    # plot current sound
-    # switch to next label
-    J.process()
-    J.wait()
-    LINES.set_ydata(Ains[0].reshape(-1))
-    store()
-    current_idx += 1
-    update()
-
-def store():
-    sound_file = os.path.join(DATA_DIR, "{}_{}.wav".format(current_idx+1, l(current_idx)))
-    scipy.io.wavfile.write(sound_file, SR, Ains[0])
-
-def update():
-    TITLE.set_text(get_current_title())
-    pyplot.draw()
 
 def setup_jack(sound):
     """
@@ -198,6 +149,19 @@ def setup_jack(sound):
     scipy.io.wavfile.write(sound_file, SR, sound)
 
 
+def setup_strain_sensors():
+    # Start Strain Sensor Node from launch file
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    rospack = rospkg.RosPack()
+    sensorLaunchfile = rospack.get_path("ros_labjack") + "/launch/twoComp_sensors.launch"
+
+    global sensorLaunch
+    sensorLaunch = roslaunch.parent.ROSLaunchParent(uuid, [sensorLaunchfile])
+
+    sensorLaunch.start()
+
+
 def setup_logger():
     """
     Setting up logger for writing to file and to console.
@@ -217,6 +181,67 @@ def setup_logger():
     logger.addHandler(console)
     logger.info("\nStarting new evaluation - {}\n".format(time.strftime("%H:%M:%S")))
 
+
+def record_strain_rosbag():
+    # Get available ROS topics
+    ros_topics = [top[0] for top in rospy.get_published_topics()]
+    print(ros_topics)
+
+    rosbagFolder = DATA_DIR + "/rosbag"
+
+    package = 'rosbag'
+    executable = 'record'
+
+    if not os.path.exists(rosbagFolder):
+        os.makedirs(rosbagFolder)
+
+    prefix = "test"
+    rosbagName = rosbagFolder + os.sep + prefix
+    node = roslaunch.core.Node(package, executable,
+                               args="-e '(/sensordata/finger)' -o {}".format(rosbagName))
+
+    launch = roslaunch.scriptapi.ROSLaunch()
+    launch.start()
+
+    global rosbagProcess
+    rosbagProcess = launch.launch(node)
+    rosbagProcess.rosbagName = rosbagName
+
+    print(" .... recording started!")
+
+
+def record_acoustic():
+    global current_idx
+    if current_idx >= len(label_list):
+        print("current_idx: {}  >= len(label_list): {}".format(current_idx, len(label_list)))
+        return
+
+    global J
+    global Ains
+    # touch object and start sound
+    # wait for recording
+    # store current sound
+    # plot current sound
+    # switch to next label
+    J.process()
+    J.wait()
+    # LINES.set_ydata(Ains[0].reshape(-1))
+    store()
+    current_idx += 1
+    # update()
+
+
+def l(i):
+    try:
+        return label_list[i]
+    except IndexError:
+        # print("current_idx: {}, i: {}".format(current_idx, i))
+        return ""
+
+
+def store():
+    sound_file = os.path.join(DATA_DIR, "{}_{}.wav".format(current_idx + 1, l(current_idx)))
+    scipy.io.wavfile.write(sound_file, SR, Ains[0])
 
 def mkpath(*args):
     """ Takes parts of a path (dir or file), joins them, creates the directory if it doesn't exist and returns the path.
