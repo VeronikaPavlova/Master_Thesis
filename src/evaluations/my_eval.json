@@ -1,0 +1,27 @@
+{
+	"name": "My Example Evaluation",
+	"description": "Experiment with 5 contact location",
+	"data_dir": "/home/nika/git/Master_Thesis/src/data/experiment_data/21_06_26_Test",
+	"result_dir": "results_test",
+	"aas": 
+	{
+		"feature": "spectrum", 
+		"comment": "feature can be: spectrum, spectrogram_dB",
+		"train_runs": [4, 5],
+		"test_runs": [1, 2, 3] 
+	
+	},
+	"ss": {
+		"train_runs": [4, 5],
+		"test_runs": [1, 2, 3] 
+	},
+
+	"sounds": ["sweep_1s"],
+	"models": {
+		"mlp_default": {
+			"save_to_disk": "None"
+		}
+	},
+		
+	"accuracy": "True"
+}

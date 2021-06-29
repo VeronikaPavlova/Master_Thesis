@@ -12,6 +12,7 @@ from ros_labjack.msg import Measurements
 BASE_DIR = "../.."
 MODEL_NAME = "Test"
 
+
 def main():
     # rospy.init_node("StrainSensor", anonymous=False)
 
@@ -24,7 +25,6 @@ def main():
     # rospy.Subscriber('/sensordata/finger_1', Measurements, strain_sensor_callback)
 
     # Python should not exit node
-    # rospy.spin()
 
 
 def experimental_loop():
@@ -35,7 +35,6 @@ def experimental_loop():
     # if char.lower() in [" ", "/n", "y"]:
     startStrainSensorNode()
     time.sleep(2)
-
 
     while looping:
         print("Space to start recording!")
@@ -58,8 +57,8 @@ def experimental_loop():
 
                 return
 
-def start_recording():
 
+def start_recording():
     # Get available ROS topics
     ros_topics = [top[0] for top in rospy.get_published_topics()]
     print(ros_topics)
@@ -86,9 +85,11 @@ def start_recording():
 
     print(" .... recording started!")
 
+
 def stop_recording():
     global rosbagProcess
     rosbagProcess.stop()
+
 
 def mkpath(*args):
     """ Takes parts of a path (dir or file), joins them, creates the directory if it doesn't exist and returns the path.
@@ -103,8 +104,8 @@ def mkpath(*args):
         os.makedirs(base_path)
     return path
 
-def startStrainSensorNode():
 
+def startStrainSensorNode():
     # Start Strain Sensor Node from launch file
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)

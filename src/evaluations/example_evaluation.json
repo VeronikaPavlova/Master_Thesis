@@ -1,0 +1,31 @@
+{
+  "name": "Example evaluation",
+  "description": "shows some options for creating a new evaluation",
+  "result_dir": "20200607_example_eval",
+  "training_data": [
+    {
+      "data_set": "Journal",
+      "experiment": "20191203_multisound_export",
+      "runs": [0, 1, 2]
+    }
+  ],
+  "test_data": [
+    {
+      "data_set": "Journal",
+      "experiment": "20191203_multisound_export",
+      "runs": [3, 4]
+    }
+  ],
+  "target_label": "contact_location",
+  "sounds": ["sweep_20ms","white_noise_20ms"],
+  "model": {
+    "name": "knn",
+    "params": "default",
+    "load_if_exists": true,
+    "save_to_disk": true
+  },
+  "plotting_functions": [
+    "confusion",
+    "scores"
+  ]
+}

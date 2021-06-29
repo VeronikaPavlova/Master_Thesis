@@ -99,7 +99,7 @@ def setup_matplotlib():
     global b_rec
 
     fix, ax = pyplot.subplots(1)
-    ax.set_ylim(-.001, .001)
+    ax.set_ylim(-.2, .2)
     pyplot.subplots_adjust(bottom=.2)
     LINES, = ax.plot(Ains[0])
     ax_back = pyplot.axes([0.59, 0.05, 0.1, 0.075])

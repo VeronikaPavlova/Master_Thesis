@@ -13,7 +13,7 @@ import rosbag
 SOUNDS = ["click", "impulse", "silence_20ms", "sweep_1s", "sweep_20ms", "white_noise_20ms"]
 
 
-def read_bags(bagFolder):
+def read_bags(bagFolder, plot=False):
     bags = []
     # If bag files exist, save the in the variable bags
     for infile in sorted(glob.glob(bagFolder)):  # use sorted() to not mix up the bag file order
@@ -21,17 +21,57 @@ def read_bags(bagFolder):
     if not bags:
         print("No bag files in folder /bagfiles!")
         exit()
-    else:
-        print('Processing the following bags:')
-        print(bags)
+    # else:
+    #     print('Processing the following bags:')
+    #     print(bags)
 
+    labels = []
+    sensors = []
     for bagFile in bags:
         bag = rosbag.Bag(bagFile)
+        n, label = get_num_and_label(bagFile)
+        if plot:
+            rosbagInfo(bag)
+            plot_data(bag)
 
-        rosbagInfo(bag)
+        sensors_one_bag = extract_sensor_data(bag)
+        sensors.extend(numpy.array(sensors_one_bag))
+        labels.extend([label] * len(sensors_one_bag))
 
-        plot_data(bag)
+    return sensors, labels
 
+
+def normalized_sensors(sensors, labels, norm_label):
+    ss_norm = []
+    for i, label in enumerate(labels):
+        if label == norm_label:
+            ss_norm.append(sensors[i])
+
+    ss_norm = numpy.array(ss_norm)
+    ss_norm_mean = numpy.mean(ss_norm, axis=0)
+    sensors_norm = [numpy.subtract(t,ss_norm_mean) for t in sensors]
+
+    print("Normalization Array " + str(ss_norm_mean))
+
+    return sensors_norm, labels
+
+
+
+def get_num_and_label(filename):
+    try:
+        # remove file extension
+        name = filename.split("/")
+        name = name [-1]
+        # remove initial number
+        name = name.split("_", 3)
+        num = int(name[1])
+        # label = "_".join(name[2:])
+        label = name[3].split(".")
+        label = int(label[0])
+        return num, label
+    except ValueError:
+        # filename with different formatting. ignore.
+        return -1, None
 
 def rosbagInfo(bag):
     print("\n--- rosbag info ---\n")
@@ -55,8 +95,7 @@ def rosbagInfo(bag):
         ))
 
 
-def plot_data(bag):
-    sensor_data = extract_sensor_data(bag)
+def plot_data(bag, sensor_data):
 
     fig, ax = plt.subplots(1)
     fig.suptitle("Sensor Data of the bag file {}".format(bag.filename))
@@ -83,25 +122,30 @@ def plot_data(bag):
 
 
 def extract_sensor_data(bag):
-    sensor_data = OrderedDict()
+    # sensor_data = OrderedDict()
+    sensor_data = []
     for topic, msg, t in bag.read_messages(topics=["/sensordata/finger"]):
         tsec = msg.header.stamp.to_sec()
+        values = []
         for i, ch in enumerate(msg.channels):
             chFixed = ch
-            if chFixed not in sensor_data:
+            # if chFixed not in sensor_data:
                 # totalMsgs = bag.get_type_and_topic_info()[1][topic].message_count
                 # totalMsgs = bag.get_type_and_topic_info()[1][topic].message_count
-                sensor_data[chFixed] = []
-            sensor_data[chFixed].append([tsec, msg.values[i]])
+                # sensor_data[chFixed] = []
+            # sensor_data[chFixed].append([tsec, msg.values[i]])
+            if ch.startswith('sensor'):
+                values.append(msg.values[i])
+        sensor_data.append(values)
 
-    for i, ch in enumerate(sensor_data.keys()):
-        sensor_data[ch] = numpy.array(sensor_data[ch])
+    # for i, ch in enumerate(sensor_data.keys()):
+    #     sensor_data[ch] = numpy.array(sensor_data[ch])
 
     return sensor_data
 
 
 if __name__ == "__main__":
-    bagFolder = '/home/nika/git/Master_Thesis/src/data/experiment_data/08_03_21_Experiment_5_Labels_Test/' + SOUNDS[0] + '/rosbag/*.bag'
+    bagFolder = '/home/nika/git/Master_Thesis/src/data/experiment_data/21_06_26_Test/rosbag/*.bag'
 
     if len(sys.argv) > 1:
         bagFolder += os.sep + sys.argv[1] + os.sep
