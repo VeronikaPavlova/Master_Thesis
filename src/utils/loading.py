@@ -15,6 +15,7 @@ FRAME_SIZE = 2048  # or 512, 1024, 2048, 4096 ... - the higher, then higher freq
 HOP_SIZE = 1024  # or 256, 512, 1024, 2048 ... - 1/2 of Frame Size (could also be 1/4, 1/8 ..)
 WINDOW_FKT = scipy.signal.windows.blackmanharris(FRAME_SIZE)  # TODO: Test different window functions Hann,..
 
+sound_duration = 0
 
 # ============ Load AAS ======================
 
@@ -26,19 +27,20 @@ def test_train_aas_data(runs=None, normalize=False, noise=False):
 
     @return:
     """
+    global sound_duration
 
     sounds = []
     labels = []
-    for fn in glob('*.wav'):
-        rep, it, label = get_num_and_label(fn)
+    for file in glob('*.wav'):
+        rep, it, label = get_num_and_label(file)
         if rep in runs:
-            sound = librosa.load(fn, sr=SR)[0]
+            sound = librosa.load(file, sr=SR)[0]
+            sound_duration = librosa.get_duration(filename=file, sr=SR)
             if noise:
                 noisy_part = sound[0:2100]
                 sound = noisereduce.reduce_noise(sound, noisy_part)
             sounds.append(sound)
             labels.append(label)
-
     if normalize:
         sounds = numpy.array(sounds)
         sounds = list((sounds - sounds.mean()) / sounds.std())
@@ -49,7 +51,7 @@ def test_train_aas_data(runs=None, normalize=False, noise=False):
 
 
 #  =============== Load SS =====================
-def read_bags(bagFolder, runs=None):
+def read_bags(bagFolder, runs=None, csv_header=None, csv_data=None, sound_duration=None):
     bags = []
 
     # If bag files exist, save the in the variable bags
@@ -68,14 +70,21 @@ def read_bags(bagFolder, runs=None):
 
         # TODO Check if sensor one bag is [] it means the rosbag is empty and no sensor was recorded
         if rep in runs:
-            sensors_one_bag = extract_sensor_data(bag)
+
+            # We want the exact start time of the audio from the rep, it and label. This way we can cut the strain sensor data
+            if csv_header is not None and csv_data is not None:
+                for data in csv_data:
+                    if(data[csv_header.index('rep')] == str(rep) and data[csv_header.index('it')] == str(it) and data[csv_header.index('curr label')] == str(label)):
+                        audio_time_start = int(data[csv_header.index('start time of record (ros)')])
+
+            sensors_one_bag = extract_sensor_data(bag, audio_time_start)
             sensors.extend(numpy.array(sensors_one_bag))
             labels.extend([label] * len(sensors_one_bag))
 
     return sensors, labels
 
 
-def extract_sensor_data(bag):
+def extract_sensor_data(bag, time):
     # sensor_data = OrderedDict()
     sensor_data = []
     for topic, msg, t in bag.read_messages(topics=["/sensordata/finger"]):

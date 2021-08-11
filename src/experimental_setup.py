@@ -36,7 +36,7 @@ LOGGING_LEVEL = logging.DEBUG
 logger = logging.getLogger("record_experiment")
 
 # CLASS_LABELS = ["top", "middle", "base"]  # classes to train
-CLASS_LABELS = list(range(0, 9))
+CLASS_LABELS = list(range(0, 4))
 SAMPLES_PER_CLASS = 5  # How often to repeat each class label
 ITERATIONS = 1  # Fot each label run the amount of iteration, so put the finger in
 SHUFFLE_RECORDING_ORDER = True  # random class order
@@ -147,10 +147,10 @@ def setup_jack():
         J.set_output_data(i, Aouts[i])
         J.set_input_data(i, Ains[i])
 
-    # logger.info("Save sound files in " + DATA_DIR)
+    logger.info("Save sound files in " + DATA_DIR)
     # store active sound for reference
-    # sound_file = os.path.join(DATA_DIR, "{}_{}.wav".format(0, sound_name))
-    # scipy.io.wavfile.write(sound_file, SR, sound)
+    sound_file = os.path.join(DATA_DIR, "{}_{}.wav".format(0, sound_name))
+    scipy.io.wavfile.write(sound_file, SR, sound)
 
 
 def setup_strain_sensors():
@@ -197,7 +197,7 @@ def setup_matplotlib():
     global b_rec
 
     fig, ax = plt.subplots(2)
-    ax[0].set_ylim(-.02, .02)
+    ax[0].set_ylim(-.03, .03)
     plt.subplots_adjust(bottom=.2)
     LINES_AAS, = ax[0].plot(Ains[0])
 
@@ -231,6 +231,8 @@ def record_sensors(event):
     logger.info("start record strain rosbag for rep label {} \n".format(label(current_idx), rep_counter[label(current_idx)]))
     record_strain_rosbag()
 
+    time.sleep(.2)
+
     for sound in SOUNDS:
         for it in range(1, ITERATIONS + 1):
             logger.info("Setup Jack for iteration {} \n".format(it))
@@ -243,7 +245,7 @@ def record_sensors(event):
 
             record_acoustic(sound, sound_folder, it)
 
-            time.sleep(.5)
+            time.sleep(.1)
 
     logger.info("stop record strain rosbag for label {} \n".format(label(current_idx)))
     stop_record_strain_rosbag()

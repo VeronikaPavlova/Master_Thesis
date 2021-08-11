@@ -1,0 +1,27 @@
+{
+	"name": "8 Loc Sensor Fusion",
+	"description": "Experiment with red finger (microphone and speaker are in the tip chamber) with 8 locations - first try for sensor fusion",
+	"data_dir": "/home/nika/git/Master_Thesis/src/data/experiment_data/21_07_27_8LocSensorFusion_RedFinger",
+	"result_dir": "results_test",
+	"aas": 
+	{
+		"feature": "spectrum", 
+		"comment": "feature can be: spectrum, spectrogram_dB",
+		"train_runs": [1, 2, 3],
+		"test_runs": [4, 5] 
+	
+	},
+	"ss": {
+		"train_runs": [1, 2, 3],
+		"test_runs": [4, 5] 
+	},
+
+	"sounds": ["sweep_1s"],
+	"models": {
+		"knn_class_default": {
+			"save_to_disk": "None"
+		}
+	},
+		
+	"accuracy": "True"
+}

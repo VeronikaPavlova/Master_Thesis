@@ -132,4 +132,4 @@ dmypy.json
 .idea
 
 # Eperimental folder folder
-/src/data/experiment_data
+/src/data/

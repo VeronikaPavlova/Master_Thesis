@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import logging
@@ -95,8 +96,9 @@ def load_aas_data(eval_json, runs):
     return sound_feauture, labels
 
 
-def loas_ss_data(strain_path, runs):
-    sensors, labels = loading.read_bags(strain_path, runs)
+def loas_ss_data(strain_path, runs, csv_header, csv_data):
+
+    sensors, labels = loading.read_bags(strain_path, runs, csv_header, csv_data, loading.sound_duration)
     sensors, labels = loading.normalized_sensors(sensors, labels, 0)
 
     return numpy.array(sensors), numpy.array(labels)
@@ -108,7 +110,7 @@ def train_models(model):
         clf = KNeighborsClassifier()
     elif model == "knn_class_grid_search":
         knn_param_grid = [{
-            "classifier__n_neighbors": [1, 2, 3, 5, 10],
+            "classifier__n_neighbors": [1, 2, 3, 5],
             "classifier__p": [1, 2],
         }]
         knn_clf = Pipeline([("classifier", KNeighborsClassifier())])
@@ -182,16 +184,30 @@ def evaluate(eval_json):
         sound_path = os.path.join(eval_json["data_dir"], sound)
         os.chdir(sound_path)
 
-        # Load AAS Data
+        # ============ Load AAS Data ==================
         logging.info("Load the AAS from dir {}".format(sound_path))
+
         # Train_data_set
         train_runs = eval_json["aas"]["train_runs"]
-        sound_feature_train, sound_labels_train = load_aas_data(eval_json, train_runs)
+        sound_feature_train, sound_label_train = load_aas_data(eval_json, train_runs)
 
         # Test_data_set
         test_runs = eval_json["aas"]["test_runs"]
-        sound_feature_test, sound_labels_test = load_aas_data(eval_json, test_runs)
+        sound_feature_test, sound_label_test = load_aas_data(eval_json, test_runs)
         logging.info("Splited AAS in train runs {} and test runs {}".format(train_runs, test_runs))
+
+        # For Time synchronization read the csv file and only use the strain data which is sync to the audio data
+        sound_csv_file = os.path.join(eval_json["data_dir"], "audio_meta.csv")
+        logging.info("Load the csv File for Time synchronization {}".format(sound_csv_file))
+
+        with open(sound_csv_file, newline='') as csvfile:
+            csvreader = csv.reader(csvfile, delimiter=',')
+            audio_csv = []
+            for num, row in enumerate(csvreader):
+                if num == 0:
+                    csv_header = row
+                else:
+                    audio_csv.append(row)
 
         # =========== Load SS Data =======================
         strain_path = "../rosbag/*.bag"
@@ -199,7 +215,7 @@ def evaluate(eval_json):
 
         # Train_ data
         train_runs = eval_json["ss"]["train_runs"]
-        strain_feature_train, strain_label_train = loas_ss_data(strain_path, train_runs)
+        strain_feature_train, strain_label_train = loas_ss_data(strain_path, train_runs, csv_header, audio_csv)
 
         # Test Data
         test_runs = eval_json["ss"]["test_runs"]
@@ -208,18 +224,18 @@ def evaluate(eval_json):
         for model in eval_json["models"]:
             clf = train_models(model)
 
-            clf.fit(strain_feature_train, strain_label_train)
+            clf.fit(sound_feature_train, sound_label_train)
 
             # save model
             # result_dir_sound = os.path.join(result_dir, sound)
             # if eval_json["models"][model]["save_to_disk"]:
             #     store_model(clf, result_dir_sound)
 
-            y_pred = clf.predict(strain_feature_test)
-            score = clf.score(strain_feature_test, strain_label_test)
+            y_pred = clf.predict(sound_feature_test)
+            score = clf.score(sound_feature_test, sound_label_test)
             logging.info("test_score_{}: {:.2f}".format(clf.name, score))
             try:
-                cm = confusion_matrix(strain_label_test, y_pred, labels=clf.classes_)
+                cm = confusion_matrix(sound_label_test, y_pred, labels=clf.classes_)
                 cm_filename = "cm_score_{}.json".format(clf.name)
                 # store_cm_and_classes(cm, score, clf.classes_, result_dir_sound, filename=cm_filename)
                 logging.info("test_score_{}: {:.2f}".format(clf.name, score))

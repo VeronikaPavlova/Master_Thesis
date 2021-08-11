@@ -26,7 +26,7 @@ import pickle
 
 import pandas as pd
 
-import load_aas_data
+from utils import loading
 import read_rosbag
 
 # constants because of the recording
@@ -35,13 +35,13 @@ PICKLE_PROTOCOL = 2  # for saving the learned KNN model
 
 TEST_SIZE = 0.2
 
-BASE_DIR = "/home/nika/git/Master_Thesis/src/data/experiment_data/Playing Around/09_03_21_Experiment_30_Labels_Test"
+BASE_DIR = "/home/nika/git/Master_Thesis/src/data/experiment_data/21_07_27_8LocSensorFusion_RedFinger"
 # SOUND_DIR_NAMES = ["sweep_20ms_default", "sweep_20ms_5_8000", "sweep_20ms_20_500", "sweep_1s", "tone_400_Hz", "tone_600_Hz", "tone_800_Hz"]
 # SOUND_DIR_NAMES = ["sweep_20ms_default", "sweep_20ms_20_1000", "sweep_20ms_1000_5000", "sweep_20ms_5000_10000",
 #                    "sweep_20ms_10000_30000", "tone_C0_16_35_Hz", "tone_C1_32_70_Hz", "tone_C2_65_42_Hz", "tone_C3_130_81_Hz", "tone_C4_261_63_Hz",
 #                    "tone_C5_523_25_Hz", "tone_C6_1046_50_Hz", "tone_C7_2093_Hz", "tone_C8_4186_Hz", "sweep_1s"]
 # SOUND_DIR_NAMES = ["click", "impulse", "silence_20ms", "sweep_20ms", "sweep_1s", "white_noise_20ms"]
-SOUND_DIR_NAMES = ["sweep_20ms"]
+SOUND_DIR_NAMES = ["sweep_1s"]
 
 
 # SOUND_DIR_NAMES = ["sweep_1s","sweep_20ms_20_10000_repeat2x", "sweep_20ms_20_10000_reverse", "sweep_20ms_10000_20_reverse", "sweep_20ms_20_10000_tone_700_reverse", "sweep_20ms_20_10000_tone_1000_reverse", "sweep_20ms_default" ]
@@ -49,27 +49,30 @@ SOUND_DIR_NAMES = ["sweep_20ms"]
 def main():
     for sound in SOUND_DIR_NAMES:
         PATH = os.path.join(BASE_DIR, sound)
-        bagFolder = PATH + "/rosbag/*.bag"
+        bagFolder = BASE_DIR + "/rosbag/*.bag"
         os.chdir(PATH)
         print("========== SOUND NAME {} ==========".format(sound))
 
         # load AAS
         print("========== AAS =========")
 
-        sounds, labels = load_aas_data.load_sounds(normalize=False, noise=False)
-        labels = numpy.array(labels)
-        # test = load_aas_data.compute_spectogram_dB(sounds[0])
-        spectra = numpy.array([load_aas_data.sound_to_spectrum(sound) for sound in sounds])
+        sounds, labels = loading.test_train_aas_data([1,5], normalize=False, noise=False)
+        y_train = numpy.array(labels)
+        X_train = numpy.array([loading.sound_to_spectrum(sound) for sound in sounds])
+
+        sounds, labels = loading.test_train_aas_data([3], normalize=False, noise=False)
+        y_test = numpy.array(labels)
+        X_test = numpy.array([loading.sound_to_spectrum(sound) for sound in sounds])
 
         score = 0
         n = 0
-        skf = StratifiedKFold(shuffle=True, n_splits=5)
-        for train_index, test_index in skf.split(spectra, labels):
-            X_train, X_test = spectra[train_index], spectra[test_index]
-            y_train, y_test = labels[train_index], labels[test_index]
-            score += run_exps(X_train, y_train, X_test, y_test, 'AAS_' + sound)
-            n += 1
-        print("Score: {}".format(score / n))
+        # skf = StratifiedKFold(shuffle=True, n_splits=5)
+        # for train_index, test_index in skf.split(spectra, labels):
+            # X_train, X_test = spectra[train_index], spectra[test_index]
+            # y_train, y_test = labels[train_index], labels[test_index]
+        score += run_exps(X_train, y_train, X_test, y_test, 'AAS_' + sound)
+            # n += 1
+        # print("Score: {}".format(score / n))
 
         # # Load Strain Sensor
         print("========== SS ==========")
@@ -95,8 +98,8 @@ def run_exps(X_train: pd.DataFrame, y_train: pd.DataFrame, X_test: pd.DataFrame,
              sensor_name) -> pd.DataFrame:
     models = [
         # ('LogReg', LogisticRegression()),
-        # ('rf_classifier', RandomForestClassifier()),
-        ('knn_classifier', KNeighborsClassifier()),
+        ('rf_classifier', RandomForestClassifier()),
+        # ('knn_classifier', KNeighborsClassifier()),
         # ('knn_regressor', KNeighborsRegressor()),
         # ('SVM', SVC()),
         # ('GNB', GaussianNB()),
